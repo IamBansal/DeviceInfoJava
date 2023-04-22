@@ -3,6 +3,10 @@ package com.example.deviceinfoappjava;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -12,29 +16,59 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.util.Size;
-import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import java.util.List;
 import kotlin.math.MathKt;
 
 public class MainActivity extends AppCompatActivity {
+
+    TextView textView;
+    SensorManager sm = null;
+    List list;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        View textView = this.findViewById(R.id.displayInfo);
+        sm = (SensorManager) getSystemService(SENSOR_SERVICE);
+        textView = this.findViewById(R.id.displayInfo);
+
+        list = sm.getSensorList(Sensor.TYPE_ACCELEROMETER);
+        if (list.size() > 0) {
+            sm.registerListener(sel, (Sensor) list.get(0), SensorManager.SENSOR_DELAY_NORMAL);
+        } else {
+            Toast.makeText(getBaseContext(), "Error: No Accelerometer.", Toast.LENGTH_LONG).show();
+        }
+
         try {
-            ((TextView) textView).setText(this.getSystemDetails());
+            textView.setText(this.getSystemDetails());
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
 
     }
 
+    SensorEventListener sel = new SensorEventListener() {
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+
+        @SuppressLint("SetTextI18n")
+        public void onSensorChanged(SensorEvent event) {
+            float[] values = event.values;
+            String sensor = "x: " + values[0] + "\ny: " + values[1] + "\nz: " + values[2];
+            try {
+                textView.setText(getSystemDetails() + sensor);
+            } catch (CameraAccessException e) {
+                Toast.makeText(MainActivity.this, "Camera Access Exception Occurred", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
     @SuppressLint({"HardwareIds"})
-    private  String getSystemDetails() throws CameraAccessException {
+    private String getSystemDetails() throws CameraAccessException {
         return "Manufacture: " + Build.MANUFACTURER + " \n" +
                 "Model: " + Build.MODEL + " \n" +
                 "Brand: " + Build.BRAND + " \n" +
@@ -63,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private  String getCamerasMegaPixel() throws CameraAccessException {
+    private String getCamerasMegaPixel() throws CameraAccessException {
         String output;
         Object service = this.getSystemService(Context.CAMERA_SERVICE);
         if (service == null) {
@@ -85,11 +119,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private  int calculateMegaPixel(float width, float height) {
+    private int calculateMegaPixel(float width, float height) {
         return MathKt.roundToInt(width * height / (float) 1024000);
     }
 
-    private  String getRAM() {
+    private String getRAM() {
         Object service = this.getSystemService(Context.ACTIVITY_SERVICE);
         if (service == null) {
             throw new NullPointerException("null cannot be cast to non-null type android.app.ActivityManager");
@@ -104,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private  String getBatteryInfo() {
+    private String getBatteryInfo() {
         Object service = this.getSystemService(Context.BATTERY_SERVICE);
         if (service == null) {
             throw new NullPointerException("null cannot be cast to non-null type android.os.BatteryManager");
