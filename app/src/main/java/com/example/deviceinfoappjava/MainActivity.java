@@ -15,9 +15,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
+import android.util.DisplayMetrics;
 import android.util.Size;
+import android.view.Display;
+import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.List;
 import kotlin.math.MathKt;
@@ -44,7 +49,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
-            textView.setText(this.getSystemDetails());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                textView.setText(this.getSystemDetails());
+            }
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -60,31 +67,41 @@ public class MainActivity extends AppCompatActivity {
             float[] values = event.values;
             String sensor = "x: " + values[0] + "\ny: " + values[1] + "\nz: " + values[2];
             try {
-                textView.setText(getSystemDetails() + sensor);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    textView.setText(getSystemDetails() + sensor);
+                }
             } catch (CameraAccessException e) {
                 Toast.makeText(MainActivity.this, "Camera Access Exception Occurred", Toast.LENGTH_SHORT).show();
             }
         }
     };
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     @SuppressLint({"HardwareIds"})
     private String getSystemDetails() throws CameraAccessException {
-        return "Manufacture: " + Build.MANUFACTURER + " \n" +
-                "Model: " + Build.MODEL + " \n" +
-                "Brand: " + Build.BRAND + " \n" +
-                this.getRAM() +
-                this.getBatteryInfo() +
-                "Version Code: " + Build.VERSION.RELEASE + '\n' +
-                "Incremental: " + Build.VERSION.INCREMENTAL + " \n" +
-                this.getCamerasMegaPixel() +
-                "SDK: " + Build.VERSION.SDK_INT + " \n" +
-                "\nDeviceID: " + Settings.Secure.getString(this.getContentResolver(), "android_id") + " \n" +
-                "ID: " + Build.ID + " \n" +
-                "User: " + Build.USER + " \n" +
-                "Type: " + Build.TYPE + " \n" +
-                "Board: " + Build.BOARD + " \n" +
-                "Host: " + Build.HOST + " \n" +
-                "FingerPrint: " + Build.FINGERPRINT + " \n";
+            return "Manufacture: " + Build.MANUFACTURER + " \n" +
+                    "Model: " + Build.MODEL + " \n" +
+                    "Brand: " + Build.BRAND + " \n" +
+                    this.getRAM() +
+                    this.getScreenResolution(this) +
+                    this.getBatteryInfo() +
+                    "Version Code: " + Build.VERSION.RELEASE + '\n' +
+                    "Incremental: " + Build.VERSION.INCREMENTAL + " \n" +
+                    this.getCamerasMegaPixel() +
+                    "SDK: " + Build.VERSION.SDK_INT + " \n" +
+                    "\nDeviceID: " + Settings.Secure.getString(this.getContentResolver(), "android_id") + " \n" +
+                    "ID: " + Build.ID + " \n" +
+                    "User: " + Build.USER + " \n" +
+                    "Type: " + Build.TYPE + " \n" +
+                    "Board: " + Build.BOARD + " \n" +
+                    "Host: " + Build.HOST + " \n" +
+                    "FingerPrint: " + Build.FINGERPRINT + " \n\n" +
+                    "Display: " + Build.DISPLAY + "\n" +
+                    "CPU ABI: " + Build.CPU_ABI + "\n" +
+                    "Radio Version: " + Build.getRadioVersion() + "\n" +
+                    "BootLoader: " + Build.BOOTLOADER + "\n" +
+                    "Hardware: " + Build.HARDWARE + "\n" +
+                    "Product: " + Build.PRODUCT + "\n";
     }
 
     private String getIMEI() {
@@ -123,6 +140,17 @@ public class MainActivity extends AppCompatActivity {
         return MathKt.roundToInt(width * height / (float) 1024000);
     }
 
+    private String getScreenResolution(Context context) {
+        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = wm.getDefaultDisplay();
+        DisplayMetrics metrics = new DisplayMetrics();
+        display.getMetrics(metrics);
+        int width = metrics.widthPixels;
+        int height = metrics.heightPixels;
+
+        return "Screen Resolution: " + width + " x " + height + " pixels \n";
+    }
+
     private String getRAM() {
         Object service = this.getSystemService(Context.ACTIVITY_SERVICE);
         if (service == null) {
@@ -134,7 +162,8 @@ public class MainActivity extends AppCompatActivity {
             double totalMemory = (double) memInfo.availMem / (double) 1073741824;
             double availMemory = Math.rint(totalMemory);
             totalMemory = Math.rint((double) memInfo.totalMem / (double) 1073741824);
-            return "Available RAM: " + availMemory + "\nTotal RAM: " + totalMemory + " \n";
+
+            return "Available RAM: " + availMemory + "\nTotal RAM: " + totalMemory + " \n" + "Is device low on RAM: " + actManager.isLowRamDevice() + "\n";
         }
     }
 
@@ -143,8 +172,17 @@ public class MainActivity extends AppCompatActivity {
         if (service == null) {
             throw new NullPointerException("null cannot be cast to non-null type android.os.BatteryManager");
         } else {
+            boolean isCharging = false;
+            long timeRem = 0;
+
             BatteryManager batLevel = (BatteryManager) service;
-            return "Battery: " + batLevel.getIntProperty(4) + " \n";
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                isCharging = batLevel.isCharging();
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                timeRem = batLevel.computeChargeTimeRemaining();
+            }
+            return "Battery: " + batLevel.getIntProperty(4) + " \n" + "Is battery in charging: " + isCharging + "\n" + "Time remaining for charging: " + timeRem / 1000 / 60 + " minutes \n";
         }
     }
 
